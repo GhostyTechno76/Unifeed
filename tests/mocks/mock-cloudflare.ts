@@ -120,6 +120,14 @@ export function createMockCloudflareEnv(initialData?: {
             });
             return { success: true, meta: { changes: 1 } };
           }
+          if (lower.includes('update problems set status = ? where id = ?')) {
+            const [newStatus, id] = boundParams;
+            const p = problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
           return { success: true, meta: { changes: 0 } };
         },
       };

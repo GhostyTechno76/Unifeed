@@ -3,8 +3,8 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'AMA College - Campus Grievance Portal',
-  description: 'Democratic Campus Problem-Reporting Platform on Cloudflare Edge',
+  title: 'Unifeed - Campus Grievance Portal',
+  description: 'Democratic Campus Problem-Reporting Platform',
 };
 
 export default function RootLayout({

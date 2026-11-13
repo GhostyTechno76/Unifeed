@@ -72,3 +72,32 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = ((await req.json().catch(() => ({}))) || {}) as any;
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ error: 'id and status are required' }, { status: 400 });
+    }
+
+    const env = await getCloudflareEnv(req);
+    await env.DB.prepare('UPDATE problems SET status = ? WHERE id = ?')
+      .bind(status, id)
+      .run();
+
+    const updated = await env.DB.prepare('SELECT * FROM problems WHERE id = ?')
+      .bind(id)
+      .first();
+
+    return NextResponse.json({ success: true, problem: updated }, { status: 200 });
+  } catch (error: any) {
+    console.error('Update problem status error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+

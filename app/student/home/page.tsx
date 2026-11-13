@@ -8,6 +8,7 @@ import {
   Bus,
   ChevronDown,
   CircleHelp,
+  Clover,
   Filter,
   GraduationCap,
   History,
@@ -110,12 +111,12 @@ function Header() {
     <header className="border-b border-[#ece5d8] bg-[#fdfaf5]">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#231a14] text-[13px] font-extrabold tracking-wide text-white">
-            AMA
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#231a14] text-white shadow-sm">
+            <Clover className="h-5 w-5 text-amber-100" />
           </div>
           <div className="leading-tight">
-            <p className="text-[17px] font-bold text-stone-900">AMA College</p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-stone-500">Student Assistance Portal</p>
+            <p className="font-serif text-lg font-bold text-stone-950">UNIFEED</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-stone-500">Student Grievance Portal</p>
           </div>
         </div>
 

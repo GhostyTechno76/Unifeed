@@ -225,6 +225,14 @@ export function getDevFallback(): CloudflareEnv {
             }
             return { success: true, meta: { changes: 1 } };
           }
+          if (lower.includes('update problems set status = ? where id = ?')) {
+            const [newStatus, id] = boundParams;
+            const p = data.problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
           return { success: true, meta: { changes: 0 } };
         },
       };

@@ -11,9 +11,24 @@ import {
   Send,
   SquarePen,
   AlertCircle,
+  Building2,
+  UtensilsCrossed,
+  Wifi,
+  Volleyball,
+  GraduationCap,
+  Bus,
 } from 'lucide-react';
 import RoleGuard from '@/components/RoleGuard';
 import { useAuth } from '@/context/AuthContext';
+
+const CATEGORIES = [
+  { id: 'wifi', label: 'Wi-Fi & Network', icon: Wifi },
+  { id: 'mess', label: 'Mess & Dining', icon: UtensilsCrossed },
+  { id: 'hostel', label: 'Hostel & Housing', icon: Building2 },
+  { id: 'library', label: 'Library & Study', icon: GraduationCap },
+  { id: 'sports', label: 'Sports & Gym', icon: Volleyball },
+  { id: 'transport', label: 'Campus & Transit', icon: Bus },
+];
 
 function SubmitForm() {
   const router = useRouter();
@@ -23,6 +38,7 @@ function SubmitForm() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
   const [category, setCategory] = useState(categoryParam || 'wifi');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,13 +59,16 @@ function SubmitForm() {
     setLoading(true);
 
     try {
+      const locStr = location.trim() ? ` [Location: ${location.trim()}]` : '';
+      const fullDescription = `[Category: ${category.toUpperCase()}]${locStr} ${description.trim()}`;
+
       const res = await fetch('/api/problems/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_id: session?.user.id || 'usr_student_01',
           title: title.trim(),
-          description: `[Category: ${category.toUpperCase()}] ${description.trim()}`,
+          description: fullDescription,
         }),
       });
 
@@ -61,7 +80,7 @@ function SubmitForm() {
       setSuccess(true);
       setTimeout(() => {
         router.push('/student/dashboard');
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       setError(err.message || 'Error submitting grievance');
       setLoading(false);
@@ -71,24 +90,24 @@ function SubmitForm() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
       <Link
-        href="/student"
-        className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-stone-600 hover:text-stone-900"
+        href="/student/dashboard"
+        className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-stone-600 transition hover:text-stone-900"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Student Portal
+        <ArrowLeft className="h-4 w-4" /> Back to Complaints Feed
       </Link>
 
-      <div className="rounded-3xl border border-white/60 bg-[#f7f3ee]/95 p-6 shadow-xl shadow-stone-900/10 backdrop-blur-md sm:p-8">
+      <div className="rounded-3xl border border-stone-200/80 bg-white/95 p-6 shadow-sm sm:p-8">
         <div className="flex items-center justify-between border-b border-stone-200 pb-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#231a14] text-white">
-              <SquarePen className="h-5 w-5" />
+              <SquarePen className="h-5 w-5 text-amber-100" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-stone-900">File a Campus Grievance</h1>
-              <p className="text-xs text-stone-500">Recorded instantly on Cloudflare D1 distributed edge database</p>
+              <p className="text-xs text-stone-500">Submit your grievance for peer upvoting and administration review</p>
             </div>
           </div>
-          <span className="rounded-full bg-[#fdeedd] px-3 py-1 text-[11px] font-bold text-[#b5651d]">
+          <span className="rounded-full bg-[#fdeedd] px-3 py-1 text-[11px] font-bold text-[#b5651d] border border-[#e6d9bf]">
             IIIT Bhubaneswar
           </span>
         </div>
@@ -96,9 +115,9 @@ function SubmitForm() {
         {success ? (
           <div className="my-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-emerald-50 p-8 text-center ring-1 ring-emerald-200">
             <CheckCircle2 className="h-12 w-12 text-emerald-600" />
-            <h2 className="text-lg font-bold text-emerald-900">Problem Submitted Successfully!</h2>
+            <h2 className="text-lg font-bold text-emerald-900">Grievance Submitted Successfully!</h2>
             <p className="text-xs text-emerald-700">
-              Your grievance has been published to the student registry. Redirecting to live dashboard...
+              Your report has been published to the student registry. Redirecting to the live dashboard...
             </p>
           </div>
         ) : (
@@ -111,22 +130,30 @@ function SubmitForm() {
             )}
 
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-stone-700">
-                Category
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-stone-700">
+                Category <span className="text-red-500">*</span>
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-              >
-                <option value="wifi">Wi-Fi &amp; Network Infrastructure</option>
-                <option value="mess">Mess &amp; Dining Hall Hygiene</option>
-                <option value="hostel">Hostel Accommodation &amp; Maintenance</option>
-                <option value="library">Library &amp; Study Facilities</option>
-                <option value="sports">Sports Arena &amp; Equipment</option>
-                <option value="academic">Academic Classrooms &amp; Laboratories</option>
-                <option value="transport">Campus Grounds &amp; Transit</option>
-              </select>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                {CATEGORIES.map((cat) => {
+                  const Icon = cat.icon;
+                  const active = category === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategory(cat.id)}
+                      className={`flex items-center gap-2 rounded-xl border p-3 text-left transition ${
+                        active
+                          ? 'border-stone-900 bg-[#231a14] text-white shadow-sm'
+                          : 'border-stone-200 bg-[#faf6ef]/50 text-stone-700 hover:border-stone-400 hover:bg-white'
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${active ? 'text-amber-200' : 'text-stone-500'}`} />
+                      <span className="text-xs font-semibold">{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div>
@@ -142,14 +169,27 @@ function SubmitForm() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Wi-Fi access point failure in Hostel 3"
-                className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-800 outline-none placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3.5 py-2.5 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-stone-700">
+                Specific Location <span className="text-stone-400 text-[10px] font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Block C, 3rd Floor, Corridor B"
+                className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3.5 py-2.5 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
               />
             </div>
 
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-wider text-stone-700">
-                  Detailed Description &amp; Location <span className="text-red-500">*</span>
+                  Detailed Description <span className="text-red-500">*</span>
                 </label>
                 <span className="text-[11px] text-stone-400">{description.length} / min 5 chars</span>
               </div>
@@ -158,19 +198,19 @@ function SubmitForm() {
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the issue, exact floor/room location, and frequency of occurrence..."
-                className="w-full rounded-xl border border-stone-300 bg-white p-3.5 text-sm text-stone-800 outline-none placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                placeholder="Describe the issue, frequency of occurrence, and how it impacts student activities..."
+                className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 p-3.5 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#231a14] py-3.5 text-sm font-bold text-white shadow transition hover:bg-black disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#231a14] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-black disabled:opacity-60"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Submitting to Cloudflare D1...
+                  <Loader2 className="h-4 w-4 animate-spin" /> Submitting Grievance...
                 </>
               ) : (
                 <>
@@ -188,22 +228,22 @@ function SubmitForm() {
 export default function SubmitProblemPage() {
   return (
     <RoleGuard allow="student">
-      <div className="min-h-screen bg-[#faf6ef]">
-        <header className="border-b border-[#ece5d8] bg-[#fdfaf5]">
+      <div className="min-h-screen bg-[#faf6ef] text-stone-900">
+        <header className="border-b border-stone-200/80 bg-white/95">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-8">
-            <Link href="/student" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#231a14] text-amber-100">
+            <Link href="/student/dashboard" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#231a14] text-amber-100 shadow-sm">
                 <Clover className="h-5 w-5" />
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">Student Portal</p>
-                <p className="font-serif text-lg font-bold text-stone-900">AMA COLLEGE</p>
+                <p className="font-serif text-lg font-bold text-stone-950">UNIFEED</p>
               </div>
             </Link>
             <div className="flex items-center gap-3">
               <Link
                 href="/student/dashboard"
-                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-800 hover:bg-stone-50"
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-800 transition hover:bg-stone-50"
               >
                 Browse Problems
               </Link>

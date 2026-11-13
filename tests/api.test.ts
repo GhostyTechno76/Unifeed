@@ -255,6 +255,21 @@ describe('College Grievance API Suite (Next.js Edge + Cloudflare D1 + Workers AI
       expect(data.count).toBe(2);
       expect(data.problems.every((p: any) => p.status === 'unresolved')).toBe(true);
     });
+
+    it('should update problem status when PATCH /api/admin/problems is called', async () => {
+      const { PATCH: patchProblemsHandler } = await import('@/app/api/admin/problems/route');
+      const req = new NextRequest('http://localhost/api/admin/problems', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'prob_01', status: 'resolved' }),
+      });
+      const res = await patchProblemsHandler(req);
+      const data = (await res.json()) as any;
+
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(mockEnv.problems.find((p) => p.id === 'prob_01')?.status).toBe('resolved');
+    });
   });
 
   describe('Task 2.4: Cloudflare Workers AI Executive Summary (/api/admin/summarize)', () => {
