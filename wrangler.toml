@@ -1,0 +1,15 @@
+name = "college-grievance"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+# Cloudflare D1 Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "campus-helpdesk-db"
+database_id = "2070c0ea-2662-4d50-8dc3-265e9f7b8c1b"
+
+# Cloudflare Workers AI Binding
+# Used with model: @cf/meta/llama-3-8b-instruct
+[ai]
+binding = "AI"
