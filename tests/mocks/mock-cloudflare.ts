@@ -74,6 +74,9 @@ export function createMockCloudflareEnv(initialData?: {
         },
         async all<T = any>(): Promise<{ results: T[] }> {
           const lower = query.toLowerCase();
+          if (lower.includes('from users')) {
+            return { results: users as unknown as T[] };
+          }
           if (lower.includes('from problems')) {
             let res = [...problems];
 
@@ -118,6 +121,31 @@ export function createMockCloudflareEnv(initialData?: {
               status: status || 'unresolved',
               created_at: created_at || new Date().toISOString(),
             });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('insert into users')) {
+            const [id, email, role] = boundParams;
+            const existing = users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
+            if (existing) {
+              existing.id = id;
+              existing.role = role || 'student';
+            } else {
+              users.push({
+                id,
+                email,
+                role: role || 'student',
+                created_at: new Date().toISOString(),
+              });
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('update problems set status = ?, description = ? where id = ?')) {
+            const [newStatus, newDesc, id] = boundParams;
+            const p = problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+              p.description = newDesc;
+            }
             return { success: true, meta: { changes: 1 } };
           }
           if (lower.includes('update problems set status = ? where id = ?')) {

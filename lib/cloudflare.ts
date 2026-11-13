@@ -170,6 +170,9 @@ export function getDevFallback(): CloudflareEnv {
         async all<T = any>(): Promise<{ results: T[] }> {
           const data = getSharedState();
           const lower = query.toLowerCase();
+          if (lower.includes('from users')) {
+            return { results: data.users as unknown as T[] };
+          }
           if (lower.includes('from problems')) {
             let res = [...data.problems];
             if (lower.includes('unresolved')) {
@@ -225,6 +228,31 @@ export function getDevFallback(): CloudflareEnv {
             }
             return { success: true, meta: { changes: 1 } };
           }
+          if (lower.includes('insert into users')) {
+            const [id, email, role] = boundParams;
+            const existing = data.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
+            if (existing) {
+              existing.id = id;
+              existing.role = role || 'student';
+            } else {
+              data.users.push({
+                id,
+                email,
+                role: role || 'student',
+                created_at: new Date().toISOString(),
+              });
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('update problems set status = ?, description = ? where id = ?')) {
+            const [newStatus, newDesc, id] = boundParams;
+            const p = data.problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+              p.description = newDesc;
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
           if (lower.includes('update problems set status = ? where id = ?')) {
             const [newStatus, id] = boundParams;
             const p = data.problems.find((x) => x.id === id);
@@ -258,19 +286,15 @@ export function getDevFallback(): CloudflareEnv {
       }
 
       const topTitles = titles.slice(0, 3);
-      const topList = topTitles.join(', ');
-
-      const para1 = `Campus grievance reports at IIIT Bhubaneswar indicate critical infrastructure challenges primarily centered around ${topList}. With ${titles.length} active unresolved grievance${titles.length > 1 ? 's' : ''} currently registered under student review, community consensus highlights that recurring service disruptions in these areas are noticeably impacting student well-being and academic readiness.`;
-
-      const secondaryAction =
-        topTitles.length > 1
-          ? ` Concurrently, facilities maintenance must audit ${topTitles.slice(1).map((t) => `"${t}"`).join(' and ')}.`
-          : '';
-
-      const para2 = `To remediate these high-priority concerns, the administration should immediately deploy technical teams to service and inspect "${topTitles[0]}".${secondaryAction} A status memorandum should be posted to the portal within 48 hours to communicate resolution milestones to the student body.`;
+      const bottlenecks = topTitles
+        .map((t, idx) => `• Issue #${idx + 1}: ${t} - Urgent disruption reported by student body.`)
+        .join('\n');
+      const actions = topTitles
+        .map((t) => `• Direct action: Deploy technical team to inspect and service "${t}".`)
+        .join('\n');
 
       return {
-        response: `${para1}\n\n${para2}`,
+        response: `Key Bottlenecks & Active Issues:\n${bottlenecks}\n\nRecommended Administrative Actions:\n${actions}\n• Post resolution progress and milestone updates to the student portal within 24–48 hours.`,
       };
     },
   };

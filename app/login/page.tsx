@@ -241,14 +241,6 @@ export default function LoginPage() {
               Grievances gain priority as more students upvote them. Administration reviews top-voted concerns directly with automated AI summaries.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push('/student/dashboard')}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-bold text-stone-900 transition hover:bg-stone-50"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Explore Issues
-          </button>
         </section>
       </main>
 

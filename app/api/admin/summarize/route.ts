@@ -48,11 +48,14 @@ async function handleSummarize(req: NextRequest) {
       .join('\n\n');
 
     const systemPrompt = `You are the Lead Campus Grievance Administrator at IIIT Bhubaneswar. You analyze student-reported campus problems and generate concise, professional executive summaries for university leadership.
-Generate exactly a 2-paragraph executive summary based on the reported issues:
-Paragraph 1: Synthesize the dominant themes, recurring patterns, and high-impact pain points across the reported grievances (such as hostel amenities, academic infrastructure, network connectivity, laboratory facilities, or student welfare).
-Paragraph 2: Provide clear, prioritized administrative recommendations and operational next steps for IIIT Bhubaneswar authorities to resolve these issues promptly.`;
+Format your output as clear, prioritized bullet points under two distinct sections:
+Key Bottlenecks & Active Issues:
+- (Concise bullet points highlighting the most urgent complaints, high-upvote issues, and locations)
 
-    const userPrompt = `Here is the current list of ${problems.length} unresolved campus problem(s):\n\n${formattedProblems}\n\nPlease generate the 2-paragraph executive summary.`;
+Recommended Administrative Actions:
+- (Concise bullet points with actionable operational remedies, technical deployments, and timelines)`;
+
+    const userPrompt = `Here is the current list of ${problems.length} unresolved campus problem(s):\n\n${formattedProblems}\n\nPlease generate the summarized bullet points briefing.`;
 
     if (!env.AI || typeof env.AI.run !== 'function') {
       return NextResponse.json(

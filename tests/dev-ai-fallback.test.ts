@@ -34,6 +34,7 @@ Please generate the 2-paragraph executive summary.`,
     expect(result.response).toContain('Defective Fire Extinguishers in Chemical Engineering Wing');
     expect(result.response).toContain('Cafeteria Food Storage Freezers Tripping Circuit');
     expect(result.response).toContain('Auditorium AV System Microphone Static');
-    expect(result.response).toContain('To remediate these high-priority concerns');
+    expect(result.response).toContain('Key Bottlenecks & Active Issues:');
+    expect(result.response).toContain('Recommended Administrative Actions:');
   });
 });

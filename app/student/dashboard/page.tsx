@@ -50,6 +50,9 @@ interface Problem {
   byEmail?: string;
   votes: number;
   goal: number;
+  eta?: string;
+  admin_notes?: string;
+  media_url?: string;
 }
 
 interface CategoryInfo {
@@ -147,16 +150,36 @@ function ProblemCard({
           </span>
         </div>
 
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-[10px] font-semibold text-stone-700">
-            <span>Escalation Threshold</span>
-            <span>
-              {votes} / {p.goal} Endorsements ({pct}%)
-            </span>
+        <div className="mt-3.5 space-y-2 border-t border-stone-100 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 font-medium text-stone-600">
+              <Clock className="h-3.5 w-3.5 text-amber-700" />
+              <span>Estimated Resolution (ETA):</span>
+              <span className="font-bold text-stone-900 bg-[#faf6ef] px-2.5 py-0.5 rounded-lg border border-stone-200">
+                {p.eta || 'Within 24–48 Hours'}
+              </span>
+            </div>
           </div>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
-            <div className="h-full rounded-full bg-emerald-600 transition-all duration-300" style={{ width: `${pct}%` }} />
-          </div>
+
+          {p.admin_notes && (
+            <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 text-xs text-amber-950">
+              <span className="font-bold block text-[11px] text-amber-900 mb-0.5">Admin Work &amp; Notes:</span>
+              <p className="leading-relaxed">{p.admin_notes}</p>
+            </div>
+          )}
+
+          {p.media_url && (
+            <div className="mt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block mb-1">
+                Resolution Work Media:
+              </span>
+              <img
+                src={p.media_url}
+                alt="Proof of work done"
+                className="max-h-56 max-w-full rounded-xl border border-stone-200 object-cover shadow-sm"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -232,13 +255,15 @@ export default function StudentDashboardPage() {
         if (data.problems && Array.isArray(data.problems)) {
           const mapped: Problem[] = data.problems.map((p: any) => {
             const cat = detectCategory(p.title, p.description);
-            const isResolved = (p.status || '').toLowerCase() === 'resolved';
-            const tone: Tone = isResolved ? 'green' : (p.upvotes || 0) >= 10 ? 'amber' : 'blue';
+            const statusStr = (p.status || '').toLowerCase();
+            const isResolved = statusStr === 'resolved' || statusStr === 'completed';
+            const isInProgress = statusStr === 'in progress' || statusStr === 'in_progress';
+            const tone: Tone = isResolved ? 'green' : isInProgress ? 'blue' : (p.upvotes || 0) >= 10 ? 'amber' : 'blue';
             const goal = Math.max(30, Math.ceil(((p.upvotes || 0) + 10) / 20) * 20);
             return {
               id: p.id,
               category: cat,
-              status: isResolved ? 'RESOLVED' : (p.upvotes || 0) >= 10 ? 'UNDER REVIEW BY DEAN' : 'INVESTIGATION ACTIVE',
+              status: isResolved ? 'COMPLETED' : isInProgress ? 'IN PROGRESS' : (p.upvotes || 0) >= 10 ? 'UNDER REVIEW BY DEAN' : 'PENDING',
               tone,
               location: extractLocation(p.description),
               title: p.title,
@@ -248,6 +273,9 @@ export default function StudentDashboardPage() {
               byEmail: p.student_email,
               votes: p.upvotes || 0,
               goal,
+              eta: p.eta || 'Within 24–48 Hours',
+              admin_notes: p.admin_notes || '',
+              media_url: p.media_url || '',
             };
           });
           setProblems(mapped);
@@ -305,19 +333,22 @@ export default function StudentDashboardPage() {
   };
 
   // Metrics computation
-  const totalProblemsCount = problems.length;
+  const activeGrievancesCount = problems.filter(
+    (p) => p.status !== 'COMPLETED' && p.status !== 'RESOLVED'
+  ).length;
   const userTicketsCount = problems.filter(
     (p) => (p.byEmail && studentEmail && p.byEmail.toLowerCase() === studentEmail.toLowerCase()) || p.by === studentId
   ).length;
-  const resolvedCount = problems.filter((p) => p.status === 'RESOLVED').length;
+  const resolvedCount = problems.filter((p) => p.status === 'COMPLETED' || p.status === 'RESOLVED').length;
   const totalEndorsementsCast = problems.reduce((acc, p) => acc + p.votes, 0);
 
   // Filtered list
   const filteredList = useMemo(() => {
     let filtered = problems.filter((p) => {
       if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
-      if (statusFilter === 'unresolved' && p.status === 'RESOLVED') return false;
-      if (statusFilter === 'resolved' && p.status !== 'RESOLVED') return false;
+      const isResolved = p.status === 'COMPLETED' || p.status === 'RESOLVED';
+      if (statusFilter === 'unresolved' && isResolved) return false;
+      if (statusFilter === 'resolved' && !isResolved) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = p.title.toLowerCase().includes(q);
@@ -426,11 +457,22 @@ export default function StudentDashboardPage() {
 
             {/* Quick Metrics Bar */}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-stone-100 pt-5">
-              <div className="rounded-xl border border-stone-100 bg-[#faf6ef]/60 p-3.5">
-                <span className="block text-[11px] font-medium text-stone-500">Active Grievances</span>
-                <span className="mt-1 block text-2xl font-extrabold text-stone-900">{totalProblemsCount}</span>
-                <span className="text-[10px] text-stone-400">Campus-wide issues</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'unresolved' ? 'all' : 'unresolved')}
+                className={`rounded-xl border p-3.5 text-left transition ${
+                  statusFilter === 'unresolved'
+                    ? 'border-amber-600 bg-amber-50 text-amber-950 ring-1 ring-amber-500'
+                    : 'border-stone-100 bg-[#faf6ef]/60 hover:bg-[#f3ece3]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-stone-500">Active Grievances</span>
+                  <Clock className="h-3.5 w-3.5 text-amber-600" />
+                </div>
+                <span className="mt-1 block text-2xl font-extrabold text-amber-700">{activeGrievancesCount}</span>
+                <span className="text-[10px] text-stone-400">Click to filter active</span>
+              </button>
 
               <div className="rounded-xl border border-stone-100 bg-[#faf6ef]/60 p-3.5">
                 <span className="block text-[11px] font-medium text-stone-500">Your Filed Reports</span>
@@ -667,28 +709,6 @@ export default function StudentDashboardPage() {
                 </span>
               </button>
             )}
-          </section>
-
-          {/* Integrated Emergency Helpline Strip (From /student/home) */}
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-5 py-4">
-            <div className="flex items-center gap-3.5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200/70 text-amber-900">
-                <TriangleAlert className="h-5 w-5" />
-              </span>
-              <div className="leading-snug">
-                <p className="text-xs sm:text-sm font-bold text-stone-900">Emergency or Utility Hazard?</p>
-                <p className="text-[11px] text-stone-600">
-                  For power outages, water pipeline leaks, or urgent medical needs, call the 24x7 Campus Helpline at{' '}
-                  <span className="font-mono font-bold text-stone-900">+91 (0) 80-2849-0199</span> directly.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/student/submit"
-              className="rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-stone-900 transition hover:bg-amber-100"
-            >
-              Report Urgent Concern
-            </Link>
           </section>
         </main>
 
