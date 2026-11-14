@@ -3,7 +3,8 @@ import { getCloudflareEnv } from '@/lib/cloudflare';
 
 export const runtime = 'edge';
 
-const MODEL_NAME = '@cf/meta/llama-3-8b-instruct';
+const MODEL_NAME = '@cf/meta/llama-3.1-8b-instruct';
+const FALLBACK_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
 interface ProblemRecord {
   id: string;
@@ -66,8 +67,9 @@ Recommended Administrative Actions:
       );
     }
 
-    // Invoke Cloudflare Workers AI model @cf/meta/llama-3-8b-instruct (with graceful fallback to llama-3.1-8b)
+    // Invoke Cloudflare Workers AI model with resilient fallback
     let aiOutput: any;
+    let usedModel = MODEL_NAME;
     try {
       aiOutput = await env.AI.run(MODEL_NAME, {
         messages: [
@@ -78,8 +80,10 @@ Recommended Administrative Actions:
         temperature: 0.3,
       });
     } catch (err: any) {
-      if (String(err?.message || err).toLowerCase().includes('deprecated')) {
-        aiOutput = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+      console.warn(`Primary model ${MODEL_NAME} failed, trying fallback ${FALLBACK_MODEL}:`, err);
+      usedModel = FALLBACK_MODEL;
+      try {
+        aiOutput = await env.AI.run(FALLBACK_MODEL, {
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -87,22 +91,26 @@ Recommended Administrative Actions:
           max_tokens: 600,
           temperature: 0.3,
         });
-      } else {
-        throw err;
+      } catch (fallbackErr: any) {
+        throw new Error(fallbackErr?.message || err?.message || 'Workers AI execution failed');
       }
     }
 
     const summaryText =
       typeof aiOutput === 'string'
         ? aiOutput
-        : aiOutput?.response || aiOutput?.result?.response || JSON.stringify(aiOutput);
+        : aiOutput?.response ||
+          aiOutput?.result?.response ||
+          aiOutput?.choices?.[0]?.message?.content ||
+          aiOutput?.result?.choices?.[0]?.message?.content ||
+          JSON.stringify(aiOutput);
 
     return NextResponse.json(
       {
         success: true,
         unresolved_count: problems.length,
         summary: summaryText,
-        model: MODEL_NAME,
+        model: usedModel,
       },
       { status: 200 }
     );

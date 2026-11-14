@@ -23,7 +23,7 @@ describe('Workers AI Summarization Verification Suite', () => {
     delete (globalThis as any).AI;
   });
 
-  it('should format grievances and invoke Workers AI model @cf/meta/llama-3-8b-instruct', async () => {
+  it('should format grievances and invoke Workers AI model @cf/meta/llama-3.1-8b-instruct', async () => {
     const mockEnv = createMockCloudflareEnv();
     (globalThis as any).DB = mockEnv.env.DB;
     (globalThis as any).AI = mockEnv.env.AI;
@@ -57,9 +57,9 @@ describe('Workers AI Summarization Verification Suite', () => {
     expect(res.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.unresolved_count).toBe(2);
-    expect(data.model).toBe('@cf/meta/llama-3-8b-instruct');
+    expect(data.model).toBe('@cf/meta/llama-3.1-8b-instruct');
     expect(mockEnv.aiCalls.length).toBe(1);
-    expect(mockEnv.aiCalls[0].model).toBe('@cf/meta/llama-3-8b-instruct');
+    expect(mockEnv.aiCalls[0].model).toBe('@cf/meta/llama-3.1-8b-instruct');
 
     // Verify system prompt and user prompt were constructed properly
     const messages = mockEnv.aiCalls[0].input.messages;

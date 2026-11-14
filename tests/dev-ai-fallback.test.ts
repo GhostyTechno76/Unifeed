@@ -29,7 +29,7 @@ Please generate the 2-paragraph executive summary.`,
       ],
     };
 
-    const result = await env.AI.run('@cf/meta/llama-3-8b-instruct', sampleInput);
+    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', sampleInput);
 
     expect(result.response).toContain('Defective Fire Extinguishers in Chemical Engineering Wing');
     expect(result.response).toContain('Cafeteria Food Storage Freezers Tripping Circuit');

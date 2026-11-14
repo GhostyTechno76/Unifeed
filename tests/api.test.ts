@@ -302,7 +302,7 @@ describe('College Grievance API Suite (Next.js Edge + Cloudflare D1 + Workers AI
   });
 
   describe('Task 2.4: Cloudflare Workers AI Executive Summary (/api/admin/summarize)', () => {
-    it('should return a 2-paragraph executive summary using @cf/meta/llama-3-8b-instruct', async () => {
+    it('should return a 2-paragraph executive summary using @cf/meta/llama-3.1-8b-instruct', async () => {
       mockEnv.problems.push(
         {
           id: 'prob_101',
@@ -334,13 +334,13 @@ describe('College Grievance API Suite (Next.js Edge + Cloudflare D1 + Workers AI
       expect(res.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.unresolved_count).toBe(2);
-      expect(data.model).toBe('@cf/meta/llama-3-8b-instruct');
+      expect(data.model).toBe('@cf/meta/llama-3.1-8b-instruct');
       expect(typeof data.summary).toBe('string');
       expect(data.summary.length).toBeGreaterThan(50);
 
       // Verify Workers AI call
       expect(mockEnv.aiCalls.length).toBe(1);
-      expect(mockEnv.aiCalls[0].model).toBe('@cf/meta/llama-3-8b-instruct');
+      expect(mockEnv.aiCalls[0].model).toBe('@cf/meta/llama-3.1-8b-instruct');
       expect(mockEnv.aiCalls[0].input.messages[1].content).toContain('Library AC malfunctioning');
       expect(mockEnv.aiCalls[0].input.messages[1].content).toContain('Central Mess drinking water cooler');
     });
