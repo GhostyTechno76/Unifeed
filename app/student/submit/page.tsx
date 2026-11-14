@@ -344,7 +344,7 @@ function SubmitForm() {
                     </div>
                     <div>
                       <h3 className="text-xs sm:text-sm font-bold text-amber-950">
-                        Kya aapka issue ye hai? Naya post karne ki jagah upvote karo:
+                        Is this your issue? Upvote existing instead of posting a duplicate:
                       </h3>
                       <p className="text-[11px] text-amber-800/90 mt-0.5">
                         1 shared card instead of 342 emails - higher upvotes accelerate official resolution.
@@ -419,7 +419,7 @@ function SubmitForm() {
                               </>
                             ) : (
                               <>
-                                <span>▲ Yehi hai, upvote</span>
+                                <span>▲ Same issue, upvote</span>
                               </>
                             )}
                           </button>
@@ -429,7 +429,7 @@ function SubmitForm() {
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900/80">
-                    <span>Alag issue hai? Neeche normal submit karo.</span>
+                    <span>Different issue? Submit normally below.</span>
                     <span className="font-semibold text-amber-950">Duplicate Prevention Active</span>
                   </div>
                 </div>
