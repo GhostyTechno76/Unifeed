@@ -4,16 +4,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
-  BarChart3,
   Clover,
   Contact,
+  Eye,
+  EyeOff,
   GraduationCap,
   Landmark,
   Loader2,
+  Lock,
   Mail,
-  Megaphone,
   Presentation,
-  ShieldCheck,
   Sparkles,
   Zap,
 } from 'lucide-react';
@@ -28,6 +28,7 @@ interface CardProps {
   userPlaceholder: string;
   helperText: string;
   quickFillEmail: string;
+  quickFillPassword: string;
   demoLabel: string;
 }
 
@@ -35,6 +36,8 @@ function LoginCard(props: CardProps) {
   const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState(props.quickFillEmail);
+  const [password, setPassword] = useState(props.quickFillPassword);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,10 +50,14 @@ function LoginCard(props: CardProps) {
       setError('Institutional email is required');
       return;
     }
+    if (!password.trim()) {
+      setError('Password is required');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const session = await login(email.trim());
+      const session = await login(email.trim(), password.trim());
       router.push(session.role === 'admin' ? '/admin' : '/student/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -60,15 +67,21 @@ function LoginCard(props: CardProps) {
 
   const handleQuickDemo = async () => {
     setEmail(props.quickFillEmail);
+    setPassword(props.quickFillPassword);
     setError('');
     setLoading(true);
     try {
-      const session = await login(props.quickFillEmail);
+      const session = await login(props.quickFillEmail, props.quickFillPassword);
       router.push(session.role === 'admin' ? '/admin' : '/student/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Demo login failed');
       setLoading(false);
     }
+  };
+
+  const handleAutoFill = () => {
+    setEmail(props.quickFillEmail);
+    setPassword(props.quickFillPassword);
   };
 
   return (
@@ -93,6 +106,7 @@ function LoginCard(props: CardProps) {
         </div>
 
         <div className="mt-5 space-y-4">
+          {/* Email input */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">
@@ -100,7 +114,7 @@ function LoginCard(props: CardProps) {
               </label>
               <button
                 type="button"
-                onClick={() => setEmail(props.quickFillEmail)}
+                onClick={handleAutoFill}
                 className="inline-flex items-center gap-1 rounded bg-[#efe6d6] px-2 py-0.5 text-[10px] font-bold text-stone-800 transition hover:bg-[#e6d9bf]"
               >
                 <Zap className="h-3 w-3 text-amber-700" /> Auto-Fill
@@ -122,6 +136,37 @@ function LoginCard(props: CardProps) {
             </p>
           </div>
 
+          {/* Password input */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">
+                Password <span className="text-red-600">*</span>
+              </label>
+              <span className="text-[10px] text-stone-400">
+                Demo: <code className="font-mono text-stone-700">{props.quickFillPassword}</code>
+              </span>
+            </div>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/50 py-2.5 pl-10 pr-10 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-200">
               {error}
@@ -136,7 +181,7 @@ function LoginCard(props: CardProps) {
           disabled={loading}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#231a14] py-3 text-sm font-bold tracking-wide text-white transition hover:bg-black disabled:opacity-60 shadow-sm"
         >
-          {loading ? 'AUTHENTICATING...' : 'SIGN IN WITH EMAIL'}
+          {loading ? 'AUTHENTICATING...' : 'SIGN IN WITH PASSWORD'}
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
         </button>
 
@@ -211,6 +256,7 @@ export default function LoginPage() {
             userPlaceholder="e.g. student@iiit-bh.ac.in"
             helperText="Submit grievances &amp; upvote peer issues"
             quickFillEmail="student@iiit-bh.ac.in"
+            quickFillPassword="student123"
             demoLabel="1-Click Login as Demo Student"
           />
           <LoginCard
@@ -221,27 +267,10 @@ export default function LoginPage() {
             userPlaceholder="e.g. admin@iiit-bh.ac.in"
             helperText="Review reports &amp; generate AI summaries"
             quickFillEmail="admin@iiit-bh.ac.in"
+            quickFillPassword="admin123"
             demoLabel="1-Click Login as Demo Administrator"
           />
         </div>
-
-        {/* Info Banner */}
-        <section className="flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-white/70 p-4 shadow-sm sm:flex-row sm:items-center">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#efe6d6] text-stone-800">
-            <Megaphone className="h-4 w-4" />
-          </div>
-          <div className="flex-1">
-            <p className="flex items-center gap-2 text-sm font-bold text-stone-900">
-              Transparent Campus Resolution
-              <span className="rounded bg-[#f3ead8] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-700 border border-[#e6d9bf]">
-                Live Network
-              </span>
-            </p>
-            <p className="mt-0.5 text-xs text-stone-600">
-              Grievances gain priority as more students upvote them. Administration reviews top-voted concerns directly with automated AI summaries.
-            </p>
-          </div>
-        </section>
       </main>
 
       {/* Footer */}

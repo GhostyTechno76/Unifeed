@@ -102,6 +102,35 @@ describe('College Grievance API Suite (Next.js Edge + Cloudflare D1 + Workers AI
       expect(res.status).toBe(400);
       expect(data.error).toBe('Invalid email format');
     });
+
+    it('should authenticate successfully with correct password', async () => {
+      const req = new NextRequest('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'student@iiit-bh.ac.in', password: 'student123' }),
+      });
+
+      const res = await loginHandler(req);
+      const data = (await res.json()) as any;
+
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.role).toBe('student');
+    });
+
+    it('should reject authentication when password is incorrect', async () => {
+      const req = new NextRequest('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'student@iiit-bh.ac.in', password: 'wrongpassword' }),
+      });
+
+      const res = await loginHandler(req);
+      const data = (await res.json()) as any;
+
+      expect(res.status).toBe(401);
+      expect(data.error).toContain('Incorrect password');
+    });
   });
 
   describe('Task 2.2: Student Problem Submission (/api/problems/submit)', () => {

@@ -4,6 +4,7 @@ export interface MockUser {
   id: string;
   email: string;
   role: 'student' | 'admin';
+  password?: string;
   created_at: string;
 }
 
@@ -34,12 +35,14 @@ export function createMockCloudflareEnv(initialData?: {
           id: 'usr_admin_01',
           email: 'admin@iiit-bh.ac.in',
           role: 'admin',
+          password: 'admin123',
           created_at: '2026-11-11 18:14:19',
         },
         {
           id: 'usr_student_01',
           email: 'student@iiit-bh.ac.in',
           role: 'student',
+          password: 'student123',
           created_at: '2026-11-11 18:14:19',
         },
       ];
@@ -124,18 +127,35 @@ export function createMockCloudflareEnv(initialData?: {
             return { success: true, meta: { changes: 1 } };
           }
           if (lower.includes('insert into users')) {
-            const [id, email, role] = boundParams;
+            const id = boundParams[0];
+            const email = boundParams[1];
+            const role = boundParams[2];
+            const password = boundParams.length === 5 ? boundParams[3] : 'student123';
             const existing = users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
             if (existing) {
               existing.id = id;
               existing.role = role || 'student';
+              if (password) existing.password = password;
             } else {
               users.push({
                 id,
                 email,
                 role: role || 'student',
+                password: password || 'student123',
                 created_at: new Date().toISOString(),
               });
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('update problems set status = ?, description = ?, eta = ?, admin_notes = ?, media_url = ? where id = ?')) {
+            const [newStatus, newDesc, newEta, newNotes, newMedia, id] = boundParams;
+            const p = problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+              p.description = newDesc;
+              (p as any).eta = newEta;
+              (p as any).admin_notes = newNotes;
+              (p as any).media_url = newMedia;
             }
             return { success: true, meta: { changes: 1 } };
           }

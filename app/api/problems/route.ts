@@ -12,6 +12,9 @@ interface ProblemRow {
   upvotes: number;
   status: string;
   created_at: string;
+  eta?: string | null;
+  admin_notes?: string | null;
+  media_url?: string | null;
 }
 
 function parseRow(p: any) {
@@ -19,11 +22,26 @@ function parseRow(p: any) {
   const etaMatch = desc.match(/\[ETA:\s*([^\]]+)\]/i);
   const notesMatch = desc.match(/\[AdminNotes:\s*([^\]]+)\]/i);
   const mediaMatch = desc.match(/\[Media:\s*([^\]]+)\]/i);
+
+  const eta = p.eta || (etaMatch ? etaMatch[1].trim() : 'Within 24–48 Hours');
+  const admin_notes = p.admin_notes || (notesMatch ? notesMatch[1].trim() : '');
+  const media_url = p.media_url || (mediaMatch ? mediaMatch[1].trim() : '');
+
+  // Strip all bracket tags from description so that neither media base64 strings nor metadata clutter human text
+  const cleanedDesc = desc
+    .replace(/\[Media:\s*[^\]]+\]/gi, '')
+    .replace(/\[ETA:\s*[^\]]+\]/gi, '')
+    .replace(/\[AdminNotes:\s*[^\]]+\]/gi, '')
+    .replace(/\[Category:\s*[^\]]+\]/gi, '')
+    .replace(/\[Location:\s*[^\]]+\]/gi, '')
+    .trim();
+
   return {
     ...p,
-    eta: etaMatch ? etaMatch[1].trim() : (p.eta || 'Within 24–48 Hours'),
-    admin_notes: notesMatch ? notesMatch[1].trim() : (p.admin_notes || ''),
-    media_url: mediaMatch ? mediaMatch[1].trim() : (p.media_url || ''),
+    description: cleanedDesc,
+    eta,
+    admin_notes,
+    media_url,
   };
 }
 
@@ -32,10 +50,28 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const sort = searchParams.get('sort')?.toLowerCase() || 'upvotes';
     const statusFilter = searchParams.get('status')?.toLowerCase();
+    const userId = searchParams.get('userId') || searchParams.get('user_id');
 
     const env = await getCloudflareEnv(req);
 
-    let query = `
+    let queryWithExtra = `
+      SELECT 
+        p.id, 
+        p.student_id, 
+        u.email as student_email,
+        p.title, 
+        p.description, 
+        p.upvotes, 
+        p.status, 
+        p.created_at,
+        p.eta,
+        p.admin_notes,
+        p.media_url
+      FROM problems p
+      LEFT JOIN users u ON p.student_id = u.id
+    `;
+
+    let baseQuery = `
       SELECT 
         p.id, 
         p.student_id, 
@@ -49,23 +85,40 @@ export async function GET(req: NextRequest) {
       LEFT JOIN users u ON p.student_id = u.id
     `;
 
-    const params: string[] = [];
+    const filterClause = statusFilter ? ` WHERE LOWER(p.status) = ?` : '';
+    const orderClause = sort === 'newest' ? ` ORDER BY p.created_at DESC` : ` ORDER BY p.upvotes DESC, p.created_at DESC`;
+    const params: string[] = statusFilter ? [statusFilter] : [];
 
-    if (statusFilter) {
-      query += ` WHERE LOWER(p.status) = ?`;
-      params.push(statusFilter);
+    let results: ProblemRow[] | undefined;
+    try {
+      const stmt = env.DB.prepare(queryWithExtra + filterClause + orderClause);
+      const res = await (params.length > 0 ? stmt.bind(...params) : stmt).all<ProblemRow>();
+      results = res.results;
+    } catch {
+      // Fallback for mock environments lacking eta/admin_notes/media_url columns
+      const stmt = env.DB.prepare(baseQuery + filterClause + orderClause);
+      const res = await (params.length > 0 ? stmt.bind(...params) : stmt).all<ProblemRow>();
+      results = res.results;
     }
 
-    if (sort === 'newest') {
-      query += ` ORDER BY p.created_at DESC`;
-    } else {
-      query += ` ORDER BY p.upvotes DESC, p.created_at DESC`;
-    }
-
-    const statement = env.DB.prepare(query);
-    const boundStatement = params.length > 0 ? statement.bind(...params) : statement;
-    const { results } = await boundStatement.all<ProblemRow>();
     const parsed = (results || []).map(parseRow);
+
+    // If userId provided, check which problems this user has upvoted
+    let upvotedIds: string[] = [];
+    if (userId) {
+      try {
+        const upvoteRows = await env.DB.prepare(
+          'SELECT problem_id FROM problem_upvotes WHERE user_id = ?'
+        )
+          .bind(userId)
+          .all<{ problem_id: string }>();
+        if (upvoteRows.results) {
+          upvotedIds = upvoteRows.results.map((r) => r.problem_id);
+        }
+      } catch {
+        // Table may not exist yet or mock env doesn't support problem_upvotes
+      }
+    }
 
     return NextResponse.json(
       {
@@ -73,6 +126,7 @@ export async function GET(req: NextRequest) {
         count: parsed.length,
         sort: sort === 'newest' ? 'newest' : 'upvotes',
         problems: parsed,
+        upvoted_ids: upvotedIds,
       },
       { status: 200 }
     );

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = ((await req.json().catch(() => ({}))) || {}) as any;
-    const { email, id, role = 'student' } = body;
+    const { email, id, role = 'student', password = 'student123' } = body;
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'A valid email address is required' }, { status: 400 });
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     const env = await getCloudflareEnv(req);
     const cleanEmail = email.trim().toLowerCase();
     const cleanId = String(id).trim();
+    const cleanPassword = String(password).trim() || 'student123';
 
     // Check if email already exists
     const existing = await env.DB.prepare(
@@ -62,11 +63,20 @@ export async function POST(req: NextRequest) {
     }
 
     const createdAt = new Date().toISOString();
-    await env.DB.prepare(
-      `INSERT INTO users (id, email, role, created_at) VALUES (?, ?, ?, ?)`
-    )
-      .bind(cleanId, cleanEmail, role, createdAt)
-      .run();
+    try {
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, role, password, created_at) VALUES (?, ?, ?, ?, ?)`
+      )
+        .bind(cleanId, cleanEmail, role, cleanPassword, createdAt)
+        .run();
+    } catch {
+      // Fallback if password column is missing in older table schema
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, role, created_at) VALUES (?, ?, ?, ?)`
+      )
+        .bind(cleanId, cleanEmail, role, createdAt)
+        .run();
+    }
 
     return NextResponse.json(
       {

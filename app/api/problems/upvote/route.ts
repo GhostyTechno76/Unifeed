@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     const body = ((await req.json().catch(() => ({}))) || {}) as any;
     const id = body.id;
     const action = body.action === 'downvote' ? -1 : 1;
+    const userId = body.userId || body.user_id;
 
     if (!id) {
       return NextResponse.json({ error: 'Problem id is required' }, { status: 400 });
@@ -15,14 +16,60 @@ export async function POST(req: NextRequest) {
 
     const env = await getCloudflareEnv(req);
 
-    if (action > 0) {
-      await env.DB.prepare('UPDATE problems SET upvotes = upvotes + 1 WHERE id = ?')
-        .bind(id)
-        .run();
+    if (userId) {
+      try {
+        if (action > 0) {
+          // Check if already upvoted
+          const existing = await env.DB.prepare(
+            'SELECT 1 FROM problem_upvotes WHERE problem_id = ? AND user_id = ?'
+          )
+            .bind(id, userId)
+            .first();
+
+          if (!existing) {
+            await env.DB.prepare(
+              'INSERT INTO problem_upvotes (problem_id, user_id) VALUES (?, ?)'
+            )
+              .bind(id, userId)
+              .run();
+
+            await env.DB.prepare('UPDATE problems SET upvotes = upvotes + 1 WHERE id = ?')
+              .bind(id)
+              .run();
+          }
+        } else {
+          await env.DB.prepare(
+            'DELETE FROM problem_upvotes WHERE problem_id = ? AND user_id = ?'
+          )
+            .bind(id, userId)
+            .run();
+
+          await env.DB.prepare('UPDATE problems SET upvotes = MAX(0, upvotes - 1) WHERE id = ?')
+            .bind(id)
+            .run();
+        }
+      } catch {
+        // Fallback if problem_upvotes table isn't present
+        if (action > 0) {
+          await env.DB.prepare('UPDATE problems SET upvotes = upvotes + 1 WHERE id = ?')
+            .bind(id)
+            .run();
+        } else {
+          await env.DB.prepare('UPDATE problems SET upvotes = MAX(0, upvotes - 1) WHERE id = ?')
+            .bind(id)
+            .run();
+        }
+      }
     } else {
-      await env.DB.prepare('UPDATE problems SET upvotes = MAX(0, upvotes - 1) WHERE id = ?')
-        .bind(id)
-        .run();
+      if (action > 0) {
+        await env.DB.prepare('UPDATE problems SET upvotes = upvotes + 1 WHERE id = ?')
+          .bind(id)
+          .run();
+      } else {
+        await env.DB.prepare('UPDATE problems SET upvotes = MAX(0, upvotes - 1) WHERE id = ?')
+          .bind(id)
+          .run();
+      }
     }
 
     const updated = await env.DB.prepare('SELECT * FROM problems WHERE id = ?')

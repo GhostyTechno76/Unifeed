@@ -19,7 +19,7 @@ export interface Session {
 interface AuthContextType {
   session: Session | null;
   ready: boolean;
-  login: (emailOrIdentifier: string) => Promise<Session>;
+  login: (emailOrIdentifier: string, password?: string) => Promise<Session>;
   logout: () => void;
 }
 
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (input: string): Promise<Session> => {
+  const login = async (input: string, password?: string): Promise<Session> => {
     let email = input.trim();
     // Convenience helper: if user typed 'student' or 'admin', map to demo institutional accounts
     if (email.toLowerCase() === 'student') {
@@ -56,10 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email = `${email}@iiit-bh.ac.in`;
     }
 
+    const payload: { email: string; password?: string } = { email };
+    if (password) {
+      payload.password = password;
+    }
+
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(payload),
     });
 
     const data = (await res.json()) as any;
@@ -98,6 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     try {
       localStorage.removeItem(STORAGE_KEY);
+      // Clean up legacy non-user-scoped key if present
+      localStorage.removeItem('unifeed_endorsed_ids');
     } catch (e) {
       console.error('Failed to clear session from storage', e);
     }

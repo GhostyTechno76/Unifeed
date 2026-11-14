@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('student', 'admin')),
+  password TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -25,8 +26,9 @@ CREATE TABLE IF NOT EXISTS users (
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `TEXT` | `PRIMARY KEY` | Unique identifier for the user (e.g., `usr_student_01` or UUID) |
-| `email` | `TEXT` | `UNIQUE`, `NOT NULL` | Institutional email address used for one-click login |
+| `email` | `TEXT` | `UNIQUE`, `NOT NULL` | Institutional email address used for login |
 | `role` | `TEXT` | `NOT NULL`, `CHECK(role IN ('student', 'admin'))` | Authorization role governing UI views and action permissions |
+| `password` | `TEXT` | `NULLABLE` | Institutional account authentication password |
 | `created_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` | Account registration timestamp |
 
 ---
@@ -43,6 +45,9 @@ CREATE TABLE IF NOT EXISTS problems (
   upvotes INTEGER DEFAULT 0,
   status TEXT DEFAULT 'unresolved',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  eta TEXT,
+  admin_notes TEXT,
+  media_url TEXT,
   FOREIGN KEY (student_id) REFERENCES users(id)
 );
 ```
@@ -53,10 +58,26 @@ CREATE TABLE IF NOT EXISTS problems (
 | `id` | `TEXT` | `PRIMARY KEY` | Unique problem ticket identifier (UUIDv4) |
 | `student_id` | `TEXT` | `NOT NULL`, `REFERENCES users(id)` | Foreign key linking the grievance to the submitting student |
 | `title` | `TEXT` | `NOT NULL` | Concise summary of the grievance |
-| `description` | `TEXT` | `NOT NULL` | Comprehensive details and location context |
+| `description` | `TEXT` | `NOT NULL` | Clean details and location context (free of raw media strings) |
 | `upvotes` | `INTEGER` | `DEFAULT 0` | Community consensus counter used for administrative prioritization |
 | `status` | `TEXT` | `DEFAULT 'unresolved'` | Current ticket state (`unresolved` or `resolved`) |
 | `created_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` | Submission timestamp |
+| `eta` | `TEXT` | `NULLABLE` | Estimated resolution time window set by administration |
+| `admin_notes` | `TEXT` | `NULLABLE` | Administrative progress notes and resolution remarks |
+| `media_url` | `TEXT` | `NULLABLE` | Public image URL or image attachment proof |
+
+---
+
+### Table: `problem_upvotes`
+Tracks unique student upvotes per problem to ensure idempotent, user-scoped endorsement tracking.
+
+```sql
+CREATE TABLE IF NOT EXISTS problem_upvotes (
+  problem_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  PRIMARY KEY (problem_id, user_id)
+);
+```
 
 ---
 

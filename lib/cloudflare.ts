@@ -8,7 +8,7 @@ export interface CloudflareEnv {
 const DEFAULT_DATABASE_ID = '2070c0ea-2662-4d50-8dc3-265e9f7b8c1b';
 
 interface StoredData {
-  users: Array<{ id: string; email: string; role: 'student' | 'admin'; created_at: string }>;
+  users: Array<{ id: string; email: string; role: 'student' | 'admin'; password?: string; created_at: string }>;
   problems: Array<{
     id: string;
     student_id: string;
@@ -17,13 +17,17 @@ interface StoredData {
     upvotes: number;
     status: string;
     created_at: string;
+    eta?: string | null;
+    admin_notes?: string | null;
+    media_url?: string | null;
   }>;
+  problem_upvotes?: Array<{ problem_id: string; user_id: string }>;
 }
 
 const SEED_DATA: StoredData = {
   users: [
-    { id: 'usr_admin_01', email: 'admin@iiit-bh.ac.in', role: 'admin', created_at: '2026-11-11 18:14:19' },
-    { id: 'usr_student_01', email: 'student@iiit-bh.ac.in', role: 'student', created_at: '2026-11-11 18:14:19' },
+    { id: 'usr_admin_01', email: 'admin@iiit-bh.ac.in', role: 'admin', password: 'admin123', created_at: '2026-11-11 18:14:19' },
+    { id: 'usr_student_01', email: 'student@iiit-bh.ac.in', role: 'student', password: 'student123', created_at: '2026-11-11 18:14:19' },
   ],
   problems: [
     {
@@ -34,8 +38,12 @@ const SEED_DATA: StoredData = {
       upvotes: 15,
       status: 'unresolved',
       created_at: '2026-11-11 18:28:34',
+      eta: 'Within 24–48 Hours',
+      admin_notes: '',
+      media_url: '',
     },
   ],
+  problem_upvotes: [],
 };
 
 function getSharedState(): StoredData {
@@ -149,6 +157,7 @@ export function getDevFallback(): CloudflareEnv {
         },
         async first<T = any>(): Promise<T | null> {
           const data = getSharedState();
+          if (!data.problem_upvotes) data.problem_upvotes = [];
           const lower = query.toLowerCase();
           if (lower.includes('from users where lower(email) = ?')) {
             const target = String(boundParams[0]).toLowerCase();
@@ -160,6 +169,11 @@ export function getDevFallback(): CloudflareEnv {
             const u = data.users.find((x) => x.id === target);
             return (u as unknown as T) || null;
           }
+          if (lower.includes('from problem_upvotes where problem_id = ? and user_id = ?')) {
+            const [pId, uId] = boundParams;
+            const found = data.problem_upvotes.find((x) => x.problem_id === pId && x.user_id === uId);
+            return (found ? ({ exists: 1 } as unknown as T) : null);
+          }
           if (lower.includes('from problems where id = ?')) {
             const target = String(boundParams[0]);
             const p = data.problems.find((x) => x.id === target);
@@ -169,9 +183,15 @@ export function getDevFallback(): CloudflareEnv {
         },
         async all<T = any>(): Promise<{ results: T[] }> {
           const data = getSharedState();
+          if (!data.problem_upvotes) data.problem_upvotes = [];
           const lower = query.toLowerCase();
           if (lower.includes('from users')) {
             return { results: data.users as unknown as T[] };
+          }
+          if (lower.includes('from problem_upvotes where user_id = ?')) {
+            const targetUser = String(boundParams[0]);
+            const votes = data.problem_upvotes.filter((x) => x.user_id === targetUser);
+            return { results: votes as unknown as T[] };
           }
           if (lower.includes('from problems')) {
             let res = [...data.problems];
@@ -198,7 +218,20 @@ export function getDevFallback(): CloudflareEnv {
         },
         async run(): Promise<{ success: boolean; meta: any }> {
           const data = getSharedState();
+          if (!data.problem_upvotes) data.problem_upvotes = [];
           const lower = query.toLowerCase();
+          if (lower.includes('insert into problem_upvotes')) {
+            const [pId, uId] = boundParams;
+            if (!data.problem_upvotes.some((x) => x.problem_id === pId && x.user_id === uId)) {
+              data.problem_upvotes.push({ problem_id: pId, user_id: uId });
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('delete from problem_upvotes')) {
+            const [pId, uId] = boundParams;
+            data.problem_upvotes = data.problem_upvotes.filter((x) => !(x.problem_id === pId && x.user_id === uId));
+            return { success: true, meta: { changes: 1 } };
+          }
           if (lower.includes('insert into problems')) {
             const [id, student_id, title, description, upvotes, status, created_at] = boundParams;
             data.problems.unshift({
@@ -229,18 +262,35 @@ export function getDevFallback(): CloudflareEnv {
             return { success: true, meta: { changes: 1 } };
           }
           if (lower.includes('insert into users')) {
-            const [id, email, role] = boundParams;
+            const id = boundParams[0];
+            const email = boundParams[1];
+            const role = boundParams[2];
+            const password = boundParams.length === 5 ? boundParams[3] : 'student123';
             const existing = data.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
             if (existing) {
               existing.id = id;
               existing.role = role || 'student';
+              if (password) existing.password = password;
             } else {
               data.users.push({
                 id,
                 email,
                 role: role || 'student',
+                password: password || 'student123',
                 created_at: new Date().toISOString(),
               });
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (lower.includes('update problems set status = ?, description = ?, eta = ?, admin_notes = ?, media_url = ? where id = ?')) {
+            const [newStatus, newDesc, newEta, newNotes, newMedia, id] = boundParams;
+            const p = data.problems.find((x) => x.id === id);
+            if (p) {
+              p.status = newStatus;
+              p.description = newDesc;
+              p.eta = newEta;
+              p.admin_notes = newNotes;
+              p.media_url = newMedia;
             }
             return { success: true, meta: { changes: 1 } };
           }

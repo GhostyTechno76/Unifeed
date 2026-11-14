@@ -49,6 +49,16 @@ interface UserRecord {
   created_at: string;
 }
 
+function cleanAdminDescription(desc: string): string {
+  return (desc || '')
+    .replace(/\[Media:\s*[^\]]+\]/gi, '')
+    .replace(/\[ETA:\s*[^\]]+\]/gi, '')
+    .replace(/\[AdminNotes:\s*[^\]]+\]/gi, '')
+    .replace(/\[Category:\s*[^\]]+\]/gi, '')
+    .replace(/\[Location:\s*[^\]]+\]/gi, '')
+    .trim();
+}
+
 export default function AdminPage() {
   const { session, logout } = useAuth();
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -77,6 +87,7 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [newStudentId, setNewStudentId] = useState('');
+  const [newStudentPassword, setNewStudentPassword] = useState('');
   const [registeringStudent, setRegisteringStudent] = useState(false);
   const [studentSuccessMsg, setStudentSuccessMsg] = useState('');
   const [studentErrorMsg, setStudentErrorMsg] = useState('');
@@ -201,6 +212,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           email: newStudentEmail.trim(),
           id: newStudentId.trim(),
+          password: newStudentPassword.trim() || 'student123',
           role: 'student',
         }),
       });
@@ -213,6 +225,7 @@ export default function AdminPage() {
       setStudentSuccessMsg(`Student ${data.user.email} (ID: ${data.user.id}) registered successfully!`);
       setNewStudentEmail('');
       setNewStudentId('');
+      setNewStudentPassword('');
       fetchUsers();
     } catch (err: any) {
       setStudentErrorMsg(err.message || 'Error registering student');
@@ -589,7 +602,7 @@ export default function AdminPage() {
                         <h3 className="text-base font-bold text-stone-900 group-hover:text-amber-950 transition-colors">
                           {p.title}
                         </h3>
-                        <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">{p.description}</p>
+                        <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">{cleanAdminDescription(p.description)}</p>
 
                         {p.admin_notes && (
                           <div className="text-[11px] text-stone-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200/60 mt-1">
@@ -734,30 +747,46 @@ export default function AdminPage() {
                     Attach Work-Done Photo / Proof
                   </label>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-[#faf6ef] px-3 py-2 text-xs font-bold text-stone-800 hover:bg-stone-200">
-                        <Upload className="h-3.5 w-3.5" />
-                        <span>Upload Photo</span>
-                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                      </label>
-                      <input
-                        type="text"
-                        value={editMediaUrl}
-                        onChange={(e) => setEditMediaUrl(e.target.value)}
-                        placeholder="Or paste image URL (https://...)"
-                        className="flex-1 rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3 py-2 text-xs text-stone-800 outline-none focus:border-stone-500 focus:bg-white"
-                      />
-                      {editMediaUrl && (
+                    {editMediaUrl?.startsWith('data:') ? (
+                      <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2.5">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <span>Photo attached from device (ready to save)</span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setEditMediaUrl('')}
-                          className="text-stone-400 hover:text-red-600 text-xs font-bold p-1"
-                          title="Remove media"
+                          className="text-xs font-bold text-red-600 hover:text-red-800 transition"
                         >
-                          Clear
+                          Remove Photo
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-[#faf6ef] px-3 py-2 text-xs font-bold text-stone-800 hover:bg-stone-200">
+                          <Upload className="h-3.5 w-3.5" />
+                          <span>Upload Photo</span>
+                          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        </label>
+                        <input
+                          type="text"
+                          value={editMediaUrl}
+                          onChange={(e) => setEditMediaUrl(e.target.value)}
+                          placeholder="Or paste image URL (https://...)"
+                          className="flex-1 rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3 py-2 text-xs text-stone-800 outline-none focus:border-stone-500 focus:bg-white"
+                        />
+                        {editMediaUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditMediaUrl('')}
+                            className="text-stone-400 hover:text-red-600 text-xs font-bold p-1"
+                            title="Remove media"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {editMediaUrl && (
                       <div className="mt-2 relative rounded-xl border border-stone-200 overflow-hidden bg-stone-50 p-2">
@@ -830,7 +859,7 @@ export default function AdminPage() {
                       {studentErrorMsg}
                     </div>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[11px] font-bold text-stone-700 mb-1">
                         Institutional Email <span className="text-red-500">*</span>
@@ -854,6 +883,18 @@ export default function AdminPage() {
                         value={newStudentId}
                         onChange={(e) => setNewStudentId(e.target.value)}
                         placeholder="e.g. B426099 or usr_subham"
+                        className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3.5 py-2 text-xs text-stone-800 outline-none focus:border-stone-500 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                        Initial Password
+                      </label>
+                      <input
+                        type="text"
+                        value={newStudentPassword}
+                        onChange={(e) => setNewStudentPassword(e.target.value)}
+                        placeholder="Default: student123"
                         className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3.5 py-2 text-xs text-stone-800 outline-none focus:border-stone-500 focus:bg-white"
                       />
                     </div>

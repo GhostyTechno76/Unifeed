@@ -110,7 +110,13 @@ function extractLocation(desc: string): string {
 }
 
 function cleanDescription(desc: string): string {
-  return desc.replace(/\[category:\s*[^\]]+\]/gi, '').replace(/\[location:\s*[^\]]+\]/gi, '').trim();
+  return desc
+    .replace(/\[category:\s*[^\]]+\]/gi, '')
+    .replace(/\[location:\s*[^\]]+\]/gi, '')
+    .replace(/\[ETA:\s*[^\]]+\]/gi, '')
+    .replace(/\[AdminNotes:\s*[^\]]+\]/gi, '')
+    .replace(/\[Media:\s*[^\]]+\]/gi, '')
+    .trim();
 }
 
 function ProblemCard({
@@ -233,23 +239,32 @@ export default function StudentDashboardPage() {
   const [expanded, setExpanded] = useState(false);
   const [endorsed, setEndorsed] = useState<Set<string>>(new Set());
 
-  // Load endorsed tickets from localStorage on mount
+  // User-scoped localStorage key so endorsements never cross-contaminate between different accounts
+  const userStorageKey = studentId ? `unifeed_endorsed_${studentId}` : 'unifeed_endorsed_guest';
+
+  // Load endorsed tickets from user-scoped localStorage whenever user session changes
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('unifeed_endorsed_ids');
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         setEndorsed(new Set(JSON.parse(saved)));
+      } else {
+        setEndorsed(new Set());
       }
     } catch (e) {
       console.warn('Failed to load endorsed tickets from localStorage', e);
+      setEndorsed(new Set());
     }
-  }, []);
+  }, [userStorageKey]);
 
   // Fetch real problems from backend
   const loadProblems = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/problems?sort=newest');
+      const url = studentId
+        ? `/api/problems?sort=newest&userId=${encodeURIComponent(studentId)}`
+        : '/api/problems?sort=newest';
+      const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as any;
         if (data.problems && Array.isArray(data.problems)) {
@@ -280,6 +295,19 @@ export default function StudentDashboardPage() {
           });
           setProblems(mapped);
         }
+
+        // If backend returns user upvotes from problem_upvotes table, sync with user's endorsed set
+        if (data.upvoted_ids && Array.isArray(data.upvoted_ids) && studentId) {
+          setEndorsed((prev) => {
+            const merged = new Set([...Array.from(prev), ...data.upvoted_ids]);
+            try {
+              localStorage.setItem(userStorageKey, JSON.stringify(Array.from(merged)));
+            } catch (e) {
+              console.warn('Failed to cache server upvotes', e);
+            }
+            return merged;
+          });
+        }
       }
     } catch (err) {
       console.warn('Failed to load backend problems:', err);
@@ -290,7 +318,7 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     loadProblems();
-  }, []);
+  }, [studentId]);
 
   const toggleEndorse = async (pid: string) => {
     const isCurrentlyEndorsed = endorsed.has(pid);
@@ -304,7 +332,7 @@ export default function StudentDashboardPage() {
     setEndorsed(nextEndorsed);
 
     try {
-      localStorage.setItem('unifeed_endorsed_ids', JSON.stringify(Array.from(nextEndorsed)));
+      localStorage.setItem(userStorageKey, JSON.stringify(Array.from(nextEndorsed)));
     } catch (e) {
       console.warn('Failed to save to localStorage', e);
     }
@@ -320,12 +348,16 @@ export default function StudentDashboardPage() {
       })
     );
 
-    // Persist to backend
+    // Persist to backend with userId
     try {
       await fetch('/api/problems/upvote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pid, action: isCurrentlyEndorsed ? 'downvote' : 'upvote' }),
+        body: JSON.stringify({
+          id: pid,
+          action: isCurrentlyEndorsed ? 'downvote' : 'upvote',
+          userId: studentId,
+        }),
       });
     } catch (e) {
       console.warn('Failed to sync upvote to backend:', e);
