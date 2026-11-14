@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -17,9 +17,22 @@ import {
   Volleyball,
   GraduationCap,
   Bus,
+  Sparkles,
 } from 'lucide-react';
 import RoleGuard from '@/components/RoleGuard';
 import { useAuth } from '@/context/AuthContext';
+import { findSimilar } from '@/lib/similarity';
+
+interface ExistingProblem {
+  id: string;
+  student_id: string;
+  student_email?: string;
+  title: string;
+  description: string;
+  upvotes: number;
+  status: string;
+  created_at: string;
+}
 
 const CATEGORIES = [
   { id: 'wifi', label: 'Wi-Fi & Network', icon: Wifi },
@@ -43,6 +56,116 @@ function SubmitForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Duplicate detection & inline upvote states
+  const [existingProblems, setExistingProblems] = useState<ExistingProblem[]>([]);
+  const [upvotingId, setUpvotingId] = useState<string | null>(null);
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  const [upvoteSuccessMessage, setUpvoteSuccessMessage] = useState<string | null>(null);
+  const [upvoteError, setUpvoteError] = useState<string | null>(null);
+
+  // Fetch unresolved problems once on mount
+  useEffect(() => {
+    let ignore = false;
+    const fetchUnresolved = async () => {
+      try {
+        const res = await fetch('/api/problems?status=unresolved');
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (!ignore && data.problems && Array.isArray(data.problems)) {
+            setExistingProblems(data.problems);
+          }
+        }
+      } catch {
+        // Fail silently - the form must keep working normally
+      }
+    };
+    fetchUnresolved();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // Sync user-scoped previously endorsed tickets from localStorage
+  useEffect(() => {
+    if (session?.user?.id) {
+      try {
+        const saved = localStorage.getItem(`unifeed_endorsed_${session.user.id}`);
+        if (saved) {
+          setVotedIds(new Set(JSON.parse(saved)));
+        }
+      } catch {
+        // Fail silently on storage errors
+      }
+    }
+  }, [session?.user?.id]);
+
+  // Real-time similarity detection with useDeferredValue
+  const deferredQuery = useDeferredValue(`${title} ${description}`);
+  const similarMatches = useMemo(() => {
+    return findSimilar(deferredQuery, existingProblems, 3);
+  }, [deferredQuery, existingProblems]);
+
+  // In-line upvote handler
+  const handleUpvote = async (problemId: string) => {
+    if (votedIds.has(problemId) || upvotingId) return;
+
+    setUpvotingId(problemId);
+    setUpvoteError(null);
+    setUpvoteSuccessMessage(null);
+
+    // Optimistically increment displayed upvotes count
+    setExistingProblems((prev) =>
+      prev.map((p) => (p.id === problemId ? { ...p, upvotes: p.upvotes + 1 } : p))
+    );
+
+    // Track as voted in component state
+    const nextVoted = new Set(votedIds);
+    nextVoted.add(problemId);
+    setVotedIds(nextVoted);
+
+    // Save to user-scoped localStorage
+    if (session?.user?.id) {
+      try {
+        localStorage.setItem(
+          `unifeed_endorsed_${session.user.id}`,
+          JSON.stringify(Array.from(nextVoted))
+        );
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+
+    try {
+      const res = await fetch('/api/problems/upvote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: problemId,
+          action: 'upvote',
+          userId: session?.user?.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as any;
+        throw new Error(data.error || 'Failed to record upvote');
+      }
+
+      setUpvoteSuccessMessage('Endorsement recorded! Your vote prioritizes this issue for dean review.');
+    } catch (err: any) {
+      // Revert optimistic count
+      setExistingProblems((prev) =>
+        prev.map((p) => (p.id === problemId ? { ...p, upvotes: Math.max(0, p.upvotes - 1) } : p))
+      );
+      const reverted = new Set(votedIds);
+      reverted.delete(problemId);
+      setVotedIds(reverted);
+      setUpvoteError(err.message || 'Error recording upvote. Please try again.');
+    } finally {
+      setUpvotingId(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +294,105 @@ function SubmitForm() {
                 placeholder="e.g. Wi-Fi access point failure in Hostel 3"
                 className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 px-3.5 py-2.5 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
               />
+
+              {similarMatches.length > 0 && !success && (
+                <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:p-5 shadow-xs ring-1 ring-amber-200">
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-200/80 text-amber-900 mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-800" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-amber-950">
+                        Kya aapka issue ye hai? Naya post karne ki jagah upvote karo:
+                      </h3>
+                      <p className="text-[11px] text-amber-800/90 mt-0.5">
+                        1 shared card instead of 342 emails - higher upvotes accelerate official resolution.
+                      </p>
+                    </div>
+                  </div>
+
+                  {upvoteError && (
+                    <div className="mb-3 flex items-center gap-2 rounded-xl bg-red-100 p-2.5 text-xs text-red-800 ring-1 ring-red-300">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{upvoteError}</span>
+                    </div>
+                  )}
+
+                  {upvoteSuccessMessage && (
+                    <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-100 p-2.5 text-xs text-emerald-900 ring-1 ring-emerald-300">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+                        <span>{upvoteSuccessMessage}</span>
+                      </div>
+                      <Link
+                        href="/student/dashboard"
+                        className="font-bold underline hover:text-emerald-950 ml-2 shrink-0 text-xs"
+                      >
+                        View Dashboard &rarr;
+                      </Link>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {similarMatches.map((m) => {
+                      const isVoted = votedIds.has(m.id);
+                      const isLoading = upvotingId === m.id;
+
+                      return (
+                        <div
+                          key={m.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-amber-200/80 bg-white/95 p-3 transition hover:border-amber-400 hover:bg-white"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-bold text-stone-900 line-clamp-1">
+                              {m.title}
+                            </p>
+                            <div className="flex items-center gap-2 text-[11px] text-stone-600 mt-0.5">
+                              <span className="font-semibold text-amber-900 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200/50">
+                                {m.upvotes} upvotes
+                              </span>
+                              <span className="text-stone-400">•</span>
+                              <span className="truncate text-stone-500">#{m.id.slice(0, 8)}</span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleUpvote(m.id)}
+                            disabled={isVoted || isLoading}
+                            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs ${
+                              isVoted
+                                ? 'bg-emerald-600 text-white cursor-default'
+                                : 'bg-[#231a14] text-white hover:bg-black disabled:opacity-60 cursor-pointer'
+                            }`}
+                          >
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Upvoting...</span>
+                              </>
+                            ) : isVoted ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Upvoted ✓</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>▲ Yehi hai, upvote</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900/80">
+                    <span>Alag issue hai? Neeche normal submit karo.</span>
+                    <span className="font-semibold text-amber-950">Duplicate Prevention Active</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
