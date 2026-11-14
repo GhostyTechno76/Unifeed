@@ -195,11 +195,19 @@ export function getDevFallback(): CloudflareEnv {
           }
           if (lower.includes('from problems')) {
             let res = [...data.problems];
-            if (lower.includes('unresolved')) {
-              res = res.filter((p) => p.status.toLowerCase() === 'unresolved');
+            if (lower.includes('not in') && lower.includes('resolved')) {
+              res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
+            } else if (lower.includes('unresolved')) {
+              res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
             } else if (lower.includes('status') && boundParams.length > 0) {
               const statusVal = String(boundParams[0] || '').toLowerCase();
-              res = res.filter((p) => p.status.toLowerCase() === statusVal);
+              if (statusVal === 'unresolved') {
+                res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
+              } else if (statusVal === 'resolved') {
+                res = res.filter((p) => p.status.toLowerCase() === 'resolved' || p.status.toLowerCase() === 'completed');
+              } else {
+                res = res.filter((p) => p.status.toLowerCase() === statusVal);
+              }
             }
 
             if (lower.includes('order by p.created_at desc') && !lower.includes('upvotes desc')) {

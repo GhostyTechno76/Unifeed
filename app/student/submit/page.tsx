@@ -63,18 +63,26 @@ function SubmitForm() {
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [upvoteSuccessMessage, setUpvoteSuccessMessage] = useState<string | null>(null);
   const [upvoteError, setUpvoteError] = useState<string | null>(null);
+  const [showDuplicatePrompt, setShowDuplicatePrompt] = useState(false);
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
 
-  // Fetch unresolved problems once on mount
+  // Fetch unresolved problems once on mount with resilient fallback
   useEffect(() => {
     let ignore = false;
     const fetchUnresolved = async () => {
       try {
-        const res = await fetch('/api/problems?status=unresolved');
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          if (!ignore && data.problems && Array.isArray(data.problems)) {
-            setExistingProblems(data.problems);
-          }
+        let res = await fetch('/api/problems?status=unresolved');
+        let data = res.ok ? ((await res.json()) as any) : null;
+        if (!data?.problems || data.problems.length === 0) {
+          res = await fetch('/api/problems');
+          data = res.ok ? ((await res.json()) as any) : null;
+        }
+        if (!ignore && data?.problems && Array.isArray(data.problems)) {
+          const active = data.problems.filter((p: any) => {
+            const s = (p.status || '').toLowerCase();
+            return s !== 'resolved' && s !== 'completed';
+          });
+          setExistingProblems(active);
         }
       } catch {
         // Fail silently - the form must keep working normally
@@ -101,9 +109,30 @@ function SubmitForm() {
   }, [session?.user?.id]);
 
   // Real-time similarity detection with useDeferredValue
-  const deferredQuery = useDeferredValue(`${title} ${description}`);
+  const deferredQuery = useDeferredValue(`${title} ${description}`.trim());
   const similarMatches = useMemo(() => {
-    return findSimilar(deferredQuery, existingProblems, 3);
+    if (!deferredQuery || existingProblems.length === 0) return [];
+
+    // 1. Pure NLP similarity engine
+    const matches = findSimilar(deferredQuery, existingProblems, 3);
+    if (matches.length > 0) return matches;
+
+    // 2. Fallback substring & keyword check for direct phrases (e.g. "Packet loss", "Volleyball", etc.)
+    const cleanQ = deferredQuery.toLowerCase().trim();
+    if (cleanQ.length >= 3) {
+      const qWords = cleanQ.split(/\s+/).filter((w) => w.length >= 3);
+      const directMatches = existingProblems.filter((p) => {
+        const text = `${p.title} ${p.description}`.toLowerCase();
+        if (cleanQ.length >= 4 && text.includes(cleanQ)) return true;
+        if (qWords.some((w) => w.length >= 4 && text.includes(w))) return true;
+        return false;
+      });
+      if (directMatches.length > 0) {
+        return directMatches.slice(0, 3);
+      }
+    }
+
+    return [];
   }, [deferredQuery, existingProblems]);
 
   // In-line upvote handler
@@ -167,8 +196,7 @@ function SubmitForm() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeSubmit = async () => {
     if (title.trim().length < 3) {
       setError('Title must be at least 3 characters');
       return;
@@ -208,6 +236,19 @@ function SubmitForm() {
       setError(err.message || 'Error submitting grievance');
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      similarMatches.length > 0 &&
+      !bypassDuplicateCheck &&
+      !votedIds.has(similarMatches[0].id)
+    ) {
+      setShowDuplicatePrompt(true);
+      return;
+    }
+    await executeSubmit();
   };
 
   return (
@@ -424,6 +465,45 @@ function SubmitForm() {
                 className="w-full rounded-xl border border-stone-300 bg-[#faf6ef]/40 p-3.5 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:bg-white focus:ring-2 focus:ring-stone-200"
               />
             </div>
+
+            {showDuplicatePrompt && similarMatches.length > 0 && (
+              <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 sm:p-5 shadow-sm ring-1 ring-amber-300">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-900 mt-0.5">
+                    <AlertCircle className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-amber-950">
+                      Possible Duplicate Issue Detected!
+                    </h4>
+                    <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
+                      A similar unresolved grievance already exists: <strong>&ldquo;{similarMatches[0].title}&rdquo;</strong> ({similarMatches[0].upvotes} upvotes).
+                      Upvoting the existing issue strengthens collective student priority for administration review.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleUpvote(similarMatches[0].id)}
+                        className="rounded-xl bg-[#231a14] px-4 py-2 text-xs font-bold text-white hover:bg-black transition shadow-xs inline-flex items-center gap-1.5"
+                      >
+                        ▲ Upvote Existing ({similarMatches[0].upvotes} votes)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDuplicatePrompt(false);
+                          setBypassDuplicateCheck(true);
+                          executeSubmit();
+                        }}
+                        className="rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
+                      >
+                        Submit as New Issue Anyway
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

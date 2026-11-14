@@ -25,6 +25,14 @@ describe('Similarity Engine (lib/similarity.ts)', () => {
     expect(matches[0].title).toBe('High packet loss on Academic Block Wi-Fi');
   });
 
+  it('matches "Packet loss" with the seeded Wi-Fi problem', () => {
+    const query = 'Packet loss';
+    const matches = findSimilar(query, [seededWifiProblem]);
+
+    expect(matches.length).toBe(1);
+    expect(matches[0].id).toBe('prob_live_01');
+  });
+
   it('does NOT match "Mess food is stale" with the Wi-Fi problem', () => {
     const query = 'Mess food is stale';
     const matches = findSimilar(query, [seededWifiProblem]);

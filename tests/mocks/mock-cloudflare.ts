@@ -84,11 +84,19 @@ export function createMockCloudflareEnv(initialData?: {
             let res = [...problems];
 
             // Status filter check
-            if (lower.includes('unresolved')) {
-              res = res.filter((p) => p.status.toLowerCase() === 'unresolved');
+            if (lower.includes('not in') && lower.includes('resolved')) {
+              res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
+            } else if (lower.includes('unresolved')) {
+              res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
             } else if (lower.includes('status') && boundParams.length > 0) {
               const statusVal = String(boundParams[0] || '').toLowerCase();
-              res = res.filter((p) => p.status.toLowerCase() === statusVal);
+              if (statusVal === 'unresolved') {
+                res = res.filter((p) => p.status.toLowerCase() !== 'resolved' && p.status.toLowerCase() !== 'completed');
+              } else if (statusVal === 'resolved') {
+                res = res.filter((p) => p.status.toLowerCase() === 'resolved' || p.status.toLowerCase() === 'completed');
+              } else {
+                res = res.filter((p) => p.status.toLowerCase() === statusVal);
+              }
             }
 
             // Ordering

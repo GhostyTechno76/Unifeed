@@ -85,9 +85,21 @@ export async function GET(req: NextRequest) {
       LEFT JOIN users u ON p.student_id = u.id
     `;
 
-    const filterClause = statusFilter ? ` WHERE LOWER(p.status) = ?` : '';
+    let filterClause = '';
+    const params: string[] = [];
+
+    if (statusFilter) {
+      if (statusFilter === 'unresolved') {
+        filterClause = ` WHERE LOWER(p.status) NOT IN ('resolved', 'completed')`;
+      } else if (statusFilter === 'resolved') {
+        filterClause = ` WHERE LOWER(p.status) IN ('resolved', 'completed')`;
+      } else {
+        filterClause = ` WHERE LOWER(p.status) = ?`;
+        params.push(statusFilter);
+      }
+    }
+
     const orderClause = sort === 'newest' ? ` ORDER BY p.created_at DESC` : ` ORDER BY p.upvotes DESC, p.created_at DESC`;
-    const params: string[] = statusFilter ? [statusFilter] : [];
 
     let results: ProblemRow[] | undefined;
     try {

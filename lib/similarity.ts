@@ -151,6 +151,36 @@ const SYNONYMS: Record<string, string> = {
   bus: 'transit',
   shuttle: 'transit',
   transit: 'transit',
+
+  // Network issues / loss
+  loss: 'loss',
+  losses: 'loss',
+  drop: 'loss',
+  drops: 'loss',
+  lag: 'loss',
+  ping: 'loss',
+
+  // Failure / down
+  down: 'fail',
+  offline: 'fail',
+  failure: 'fail',
+  fail: 'fail',
+  disconnect: 'fail',
+  disconnected: 'fail',
+
+  // Sports
+  volleyball: 'sports',
+  cricket: 'sports',
+  football: 'sports',
+  badminton: 'sports',
+  sports: 'sports',
+
+  // Library & study
+  library: 'library',
+  book: 'library',
+  books: 'library',
+  reading: 'library',
+  study: 'library',
 };
 
 /**
