@@ -975,9 +975,15 @@ export default function AdminPage() {
 
         {/* 3. Modal: AI Executive Briefing (No Cloudflare mention, Bullet points) */}
         {aiModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setAiModalOpen(false);
+            }}
+          >
+            <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Pinned Header with Close X */}
+              <div className="flex shrink-0 items-center justify-between border-b border-stone-200 p-4 sm:p-5 pb-3">
                 <div className="flex items-center gap-2 text-amber-600">
                   <Sparkles className="h-5 w-5" />
                   <h3 className="text-base font-bold text-stone-900">
@@ -985,40 +991,48 @@ export default function AdminPage() {
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setAiModalOpen(false)}
-                  className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                  aria-label="Close modal"
+                  className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="py-5">
+              {/* Scrollable Summary Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5">
                 {aiLoading ? (
-                  <div className="flex flex-col items-center justify-center gap-3 py-10">
+                  <div className="flex flex-col items-center justify-center gap-3 py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
                     <p className="text-xs font-semibold text-stone-600">
                       Synthesizing student grievances into prioritized bullet points...
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4 text-xs leading-relaxed text-stone-800 whitespace-pre-line bg-[#faf6ef] p-5 rounded-xl border border-stone-200 font-sans">
+                  <div className="space-y-4 text-xs leading-relaxed text-stone-800 whitespace-pre-line bg-[#faf6ef] p-5 rounded-xl border border-stone-200 font-sans shadow-inner">
                     {aiSummary}
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center justify-between border-t border-stone-200 pt-3">
-                <span className="text-[11px] text-stone-500 font-medium">AI Grievance Intelligence System</span>
-                <div className="flex items-center gap-2">
+              {/* Pinned Footer with Action & Close Button */}
+              <div className="flex shrink-0 items-center justify-between border-t border-stone-200 p-4 sm:p-5 pt-3 bg-stone-50/60">
+                <span className="text-[11px] text-stone-500 font-medium hidden sm:inline">
+                  AI Grievance Intelligence System
+                </span>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
+                    type="button"
                     onClick={copyToClipboard}
                     disabled={aiLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-800 transition hover:bg-stone-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-800 transition hover:bg-stone-50 disabled:opacity-50"
                   >
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                     {copied ? 'Copied!' : 'Copy Summary'}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setAiModalOpen(false)}
                     className="rounded-lg bg-[#231a14] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-black"
                   >
